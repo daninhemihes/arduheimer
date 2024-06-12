@@ -55,13 +55,25 @@ float timeMultiplier = 1;
 //---------- GAME ----------//
 int errors = 0;
 int difficulty = 1;
+int timer_numbers = 0;
 String serial_number = "";
+bool ptb_status = false;
+bool gen_status = false;
+bool mem_status = false;
 
 //---------- BUZZER ----------//
 long lastBuzzerChange = 0;
 int buzzerState = 0;
 long buzzerDurations[] = {600, 300, 100};
 long buzzerInterval = 0;
+
+//---------- MODULES ----------//
+enum Color {
+    RED,
+    GREEN,
+    BLUE,
+    YELLOW
+};
 
 
 void setup() {
@@ -98,11 +110,19 @@ void setup() {
 }
 
 void loop() {
-  //if(serial_number != ""){
+  if(serial_number != ""){
+    //----------Game Running----------//
     updateTimer();
     updateBuzzer();
     modulePTBLoop();
-  //} else {
+
+    
+    modulePTBLoop(serial_number);
+    module1Loop(serial_number);
+    module2Loop(serial_number);
+    module3Loop(serial_number);
+  } else {
+    //----------Test Mode----------//
     int ptb_btn = digitalRead(MOD_PTB_BTN);
     int ptb_gen_r = digitalRead(MOD_GEN_BTN_R);
     int ptb_gen_g = digitalRead(MOD_GEN_BTN_G);
@@ -180,7 +200,7 @@ void loop() {
       digitalWrite(MOD_GEN_LED_OK, LOW);
       digitalWrite(MOD_MEM_LED_OK, LOW);
     }
-  //}
+  }
 }
 
 
@@ -205,7 +225,86 @@ void gameWin() {
   
 }
 
+void addError(){
+  errors++;
+  if(errors == 1){
+    digitalWrite(ERR_LED_1, HIGH);
+  }
+  else if (errors == 2) {
+    digitalWrite(ERR_LED_2, HIGH);
+  }
+  else if (errors > 2) {
+    gameOver();
+  }
+}
 
+Color generateRandomColor(){
+  int randomValue = random(4);
+  return static_cast<Color>(randomValue);
+}
+
+bool checkSerialNumberHasVowel() {
+  const char *ptr = serial_number.c_str();
+  while (*ptr != '\0') {
+    if (*ptr == 'A' || *ptr == 'E') {
+      return true;
+    }
+    ptr++;
+  }
+  return false;
+}
+
+bool checkLastCharSerialNumberIsEvenNumber() {
+  const char *ptr = serial_number.c_str();
+  char lastChar = *(ptr + serial_number.length() - 1);
+  return (lastChar == '0' || lastChar == '2' || lastChar == '4' || lastChar == '6' || lastChar == '8');
+}
+
+bool checkLastCharSerialNumberIsOddNumber(){
+  const char *ptr = serial_number.c_str();
+  char lastChar = *(ptr + serial_number.length() - 1);
+  return (lastChar == '1' || lastChar == '3' || lastChar == '5' || lastChar == '7' || lastChar == '9');
+}
+
+int countSerialNumberEvens(){
+  const char *ptr = serial_number.c_str();
+  int count = 0;
+  while (*ptr != '\0') {
+    if (*ptr == '0' || *ptr == '2' || *ptr == '4' || *ptr == '6' || *ptr == '8') {
+      count++;
+    }
+    ptr++;
+  }
+  return count;
+}
+
+int countSerialNumberOdds(){
+  const char *ptr = serial_number.c_str();
+  int count = 0;
+  while (*ptr != '\0') {
+    if (*ptr == '1' || *ptr == '3' || *ptr == '5' || *ptr == '7' || *ptr == '9') {
+      count++;
+    }
+    ptr++;
+  }
+  return count;
+}
+
+bool timerHasDigit(char number) {
+  char str[5];
+  itoa(timer_numbers, str, 10);
+  
+  char *p = str;
+  
+  while (*p != '\0') {
+    if (*p == number) {
+      return true;
+    }
+    p++;
+  }
+  
+  return false;
+}
 
 
 
@@ -284,6 +383,7 @@ void updateTimer() {
   int result = minutes * 100 + seconds;
 
   display_timer.showNumberDecEx(result, 0b01000000, true);
+  timer_numbers = result;
 }
 
 void updateBuzzer() {
@@ -313,10 +413,206 @@ void updateBuzzer() {
 
 // ------------------------------------------------------------------------------- //
 // -------------------------- MODULE - PRESS THE BUTTON -------------------------- //
-// ------------------------------------------------------------------------------ //
+// ------------------------------------------------------------------------------- //
 
-void modulePTBLoop() {
-  int buttonState = digitalRead(MOD_PTB_BTN);
+bool ptb_pressing = false;
+Color ptb_color_stage_1, ptb_color_stage_2;
+
+//Changes the color of the led to the desired color.
+//The led needs to set 'LOW' to 'on' colors and 'HIGH' to 'off' colors.
+void modulePTBChangeColor(Color color){
+  switch (color) {
+    case RED:
+      digitalWrite(MOD_PTB_LED_R, LOW);
+      digitalWrite(MOD_PTB_LED_B, HIGH);
+      digitalWrite(MOD_PTB_LED_G, HIGH);
+      break;
+    case BLUE:
+      digitalWrite(MOD_PTB_LED_R, HIGH);
+      digitalWrite(MOD_PTB_LED_B, LOW);
+      digitalWrite(MOD_PTB_LED_G, HIGH);
+      break;
+    case GREEN:
+      digitalWrite(MOD_PTB_LED_R, HIGH);
+      digitalWrite(MOD_PTB_LED_B, HIGH);
+      digitalWrite(MOD_PTB_LED_G, LOW);
+      break;
+    case YELLOW:
+      digitalWrite(MOD_PTB_LED_R, LOW);
+      digitalWrite(MOD_PTB_LED_B, HIGH);
+      digitalWrite(MOD_PTB_LED_G, LOW);
+      break;
+  }
+}
+
+//Starts the module by generating the colors randomly
+void modulePTBStart(const char* serial_number){
+  ptb_color_stage_1 = generateRandomColor();
+  ptb_color_stage_2 = generateRandomColor();
+
+  modulePTBChangeColor(ptb_color_stage_1);
+}
+
+//When button is pressed, starts stage 1 checker
+//If the color is related to press only, it will automatically unlock the module
+//If not, shows the color of stage 2 (releasing the button)
+void modulePTBStage1() {
+  bool endsWithEven = checkLastCharSerialNumberIsEvenNumber();
+  bool endsWithOdd = checkLastCharSerialNumberIsOddNumber();
+  int countEvens = countSerialNumberEvens();
+
+  if (ptb_color_stage_1 == BLUE && endsWithOdd){
+    modulePTBChangeColor(ptb_color_stage_2);
+  }
+  else if (ptb_color_stage_1 == GREEN && countEvens >= 2){
+    ptb_status == true;
+    digitalWrite(MOD_PTB_LED_OK, HIGH);
+  }
+  else if (ptb_color_stage_1 == YELLOW && endsWithEven){
+    modulePTBChangeColor(ptb_color_stage_2);
+  }
+  else if (ptb_color_stage_1 == RED){
+    ptb_status == true;
+    digitalWrite(MOD_PTB_LED_OK, HIGH);
+  }
+  else {
+    modulePTBChangeColor(ptb_color_stage_2);
+  }
+}
+
+//When button is released, starts stage 2 checker
+//If the button was released correctly, it will automatically unlock the module
+//If not, will add an error to the player
+void modulePTBStage2(int time_released) {
+  if(ptb_color_stage_2 == BLUE){
+    if(timerHasDigit('4')){
+      ptb_status == true;
+      digitalWrite(MOD_PTB_LED_OK, HIGH);
+    } else {
+      addError();
+    }
+  }
+  else if(ptb_color_stage_2 == GREEN){
+    if(timerHasDigit('1')){
+      ptb_status == true;
+      digitalWrite(MOD_PTB_LED_OK, HIGH);
+    } else {
+      addError();
+    }
+  }
+  else if(ptb_color_stage_2 == YELLOW){
+    if(timerHasDigit('5')){
+      ptb_status == true;
+      digitalWrite(MOD_PTB_LED_OK, HIGH);
+    } else {
+      addError();
+    }
+  }
+  else{
+    if(timerHasDigit('1')){
+      ptb_status == true;
+      digitalWrite(MOD_PTB_LED_OK, HIGH);
+    } else {
+      addError();
+    }
+  }
+}
+
+//Loop function that checks button status changes of the module
+void modulePTBLoop(const char* serial_number) {
+  if(ptb_status == true) return;
+
+  int button_state = digitalRead(MOD_PTB_BTN);
+
+  //Button changed to PRESSED
+  if (button_state == HIGH && ptb_pressing == false){
+    ptb_pressing = true;
+    modulePTBStage1();
+  }
+
+  //Button changed to RELEASED
+  if (button_state == LOW && ptb_pressing == true){
+    ptb_pressing = false;
+    modulePTBStage2();
+  }
 }
 
 
+
+
+//Modulo 2
+void module2Loop(const char* serial) {
+  Color ledColor = generateRandomColor();
+  if (ledColor == RED || ledColor == PURPLE || ledColor == GREEN) {
+    if (hasVowel(serial)) {
+      switch (ledColor) {
+        case RED:
+          digitalWrite(MOD_SMS_LED_R, HIGH);
+          break;
+        case PURPLE:
+          digitalWrite(MOD_SMS_LED_P, HIGH);
+          break;
+        case GREEN:
+          digitalWrite(MOD_SMS_LED_G, HIGH);
+          break;
+      }
+    } else {
+      switch (ledColor) {
+        case RED:
+          digitalWrite(MOD_SMS_LED_Y, HIGH);
+          break;
+        case PURPLE:
+          digitalWrite(MOD_SMS_LED_Y, HIGH);
+          break;
+        case GREEN:
+          digitalWrite(MOD_SMS_LED_R, HIGH);
+          break;
+      }
+    }
+    delay(1000);
+    digitalWrite(MOD_SMS_LED_R, LOW);
+    digitalWrite(MOD_SMS_LED_Y, LOW);
+    digitalWrite(MOD_SMS_LED_P, LOW);
+    digitalWrite(MOD_SMS_LED_G, LOW);
+  }
+}
+
+//Modulo 3
+void module3Loop(const char* serial) {
+  srand(time(NULL));
+  const int numStages = 5;
+  const int numButtons = 4;
+
+  for (int stage = 1; stage <= numStages; ++stage) {
+    int randomNumber = generateRandomNumber();
+    Serial.print("Número exibido: ");
+    Serial.println(randomNumber);
+
+    int buttonToPress;
+    if (randomNumber == 1) {
+      buttonToPress = (stage == 2 || stage == 4) ? serial[0] - '0' : serial[1] - '0';
+    } else if (randomNumber == 2) {
+      buttonToPress = (stage == 3 || stage == 5) ? serial[0] - '0' : serial[1] - '0';
+    } else if (randomNumber == 3) {
+      buttonToPress = (stage == 1 || stage == 4) ? serial[2] - '0' : 4;
+    } else {
+      buttonToPress = (stage == 1 || stage == 3) ? serial[2] - '0' : 4;
+    }
+
+    Serial.print("Pressione o botão com o número ");
+    Serial.println(buttonToPress);
+    delay(3000);
+
+    int userInput = 0; // Simulando entrada do usuário (0 como valor padrão)
+    if (digitalRead(buttonToPress) == HIGH) {
+      userInput = buttonToPress;
+    }
+
+    if (userInput != buttonToPress) {
+      Serial.println("Erro! Recomeçando o módulo no Estágio 1.");
+      errors++;
+      return;
+    }
+  }
+  Serial.println("Parabéns! Você desarmou o módulo.");
+}
