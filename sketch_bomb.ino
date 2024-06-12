@@ -59,7 +59,7 @@ int timer_numbers = 0;
 String serial_number = "";
 bool ptb_status = false;
 bool gen_status = false;
-bool mem_status = false;
+bool mem_status = true;
 int mod_gen_length = 4;
 
 //---------- BUZZER ----------//
@@ -86,10 +86,29 @@ enum Color {
 // -------------------------------------------------------------------------- //
 
 void startGame() {
+  timer_ms = 0;
+  start_ms = 0;
+  timeMultiplier = 1;
+  errors = 0;
+  difficulty = 1;
+  timer_numbers = 0;
+  serial_number = "";
+  ptb_status = false;
+  gen_status = false;
+  mem_status = true;
+  mod_gen_length = 4;
   generateSerialNumber();
   modulePTBStart();
   moduleGENStart();
+  //moduleMEMStart();
+  moduleMEMUnlockModule();
   startTimer();
+  digitalWrite(MOD_MEM_LED_OK, HIGH);
+}
+
+void restartGame(){
+    gameOver();
+    startGame();
 }
 
 void gameOver() {
@@ -111,6 +130,18 @@ void gameOver() {
   display_main.print("A Bomba Explodiu!");
   display_main.setCursor(0,1);
   display_main.print(buffer);
+
+  timer_ms = 0;
+  start_ms = 0;
+  timeMultiplier = 1;
+  errors = 0;
+  difficulty = 1;
+  timer_numbers = 0;
+  serial_number = "";
+  ptb_status = false;
+  gen_status = false;
+  mem_status = true;
+  mod_gen_length = 4;
 }
 
 void gameWin() {
@@ -132,6 +163,23 @@ void gameWin() {
   display_main.print("Bomba desarmada! <3");
   display_main.setCursor(0,1);
   display_main.print(buffer);
+}
+
+void checkModulesUnlocked(){
+  if(ptb_status && gen_status){
+    gameWin();
+    int melody[] = {
+      262, 294, 330, 349, 392, 440, 494, 523
+    };
+    int noteDurations[] = {
+      500, 500, 500, 500, 500, 500, 500, 500
+    };
+    for (int i = 0; i < 8; i++) {
+      tone(BUZZER_PIN, melody[i], noteDurations[i]);
+      delay(noteDurations[i] * 1.3); // Pausa entre as notas
+    }
+    noTone(BUZZER_PIN);
+  }
 }
 
 void gameChangeDifficulty(){
@@ -248,6 +296,15 @@ bool timerHasDigit(char number) {
   }
   
   return false;
+}
+
+int findIndex(int array[], int size, int target) {
+  for (int i = 0; i < size; i++) {
+    if (array[i] == target) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 void generateSerialNumber() {
@@ -490,6 +547,14 @@ bool gen_btn_b = false;
 bool gen_btn_y = false;
 
 void moduleGENStart(){
+  gen_current_stage = 0;
+  gen_current_press = 0;
+  gen_stage_last_blink = 0;
+  gen_ms_last_blink = 0;
+  gen_btn_r = false;
+  gen_btn_g = false;
+  gen_btn_b = false;
+  gen_btn_y = false;
   color_sequence_show = generateRandomColorSequence(mod_gen_length);
   moduleGENGenerateResult();
 }
@@ -736,86 +801,272 @@ void moduleGENGenerateResult(){
 
 
 
-
-
-void module2Loop(const char* serial) {
-  Color ledColor = generateRandomColor();
-  if (ledColor == RED || ledColor == BLUE || ledColor == GREEN) {
-    if (checkSerialNumberHasVowel()) {
-      switch (ledColor) {
-        case RED:
-          digitalWrite(MOD_GEN_LED_R, HIGH);
-          break;
-        case BLUE:
-          digitalWrite(MOD_GEN_LED_B, HIGH);
-          break;
-        case GREEN:
-          digitalWrite(MOD_GEN_LED_G, HIGH);
-          break;
-      }
-    } else {
-      switch (ledColor) {
-        case RED:
-          digitalWrite(MOD_GEN_LED_Y, HIGH);
-          break;
-        case BLUE:
-          digitalWrite(MOD_GEN_LED_Y, HIGH);
-          break;
-        case GREEN:
-          digitalWrite(MOD_GEN_LED_R, HIGH);
-          break;
-      }
-    }
-    digitalWrite(MOD_GEN_LED_R, LOW);
-    digitalWrite(MOD_GEN_LED_Y, LOW);
-    digitalWrite(MOD_GEN_LED_B, LOW);
-    digitalWrite(MOD_GEN_LED_G, LOW);
-  }
-}
-
-
-
-
-
 // --------------------------------------------------------------------- //
 // -------------------------- MODULE - MEMORY -------------------------- //
 // --------------------------------------------------------------------- //
-void module3Loop(const char* serial) {
-  const int numStages = 5;
-  const int numButtons = 4;
+int mem_stages_labels[5][4];
+int mem_stages_numbers[5];
+int mem_stages_correct_positions[5];
+int mem_current_stage = 0;
+bool mem_btn_1 = false;
+bool mem_btn_2 = false;
+bool mem_btn_3 = false;
+bool mem_btn_4 = false;
 
-  for (int stage = 1; stage <= numStages; ++stage) {
-    int randomNumber = random(1, 5);
-    Serial.print("Número exibido: ");
-    Serial.println(randomNumber);
+void moduleMEMStart(){
+  moduleMEMGenerateRandomLabels();
+  moduleMEMGenerateRandomNumbers();
+  moduleMEMGenerateCorrectPositions();
+  moduleMEMDisplay(0);
+  Serial.println(mem_stages_numbers[0]);
+  Serial.println(mem_stages_correct_positions[0]);
+}
 
-    int buttonToPress;
-    if (randomNumber == 1) {
-      buttonToPress = (stage == 2 || stage == 4) ? serial[0] - '0' : serial[1] - '0';
-    } else if (randomNumber == 2) {
-      buttonToPress = (stage == 3 || stage == 5) ? serial[0] - '0' : serial[1] - '0';
-    } else if (randomNumber == 3) {
-      buttonToPress = (stage == 1 || stage == 4) ? serial[2] - '0' : 4;
+void moduleMEMLoop(){
+  if(mem_status == true) return;
+
+  moduleMEMCheckButton();
+}
+
+void moduleMEMUnlockModule(){
+  mem_status = true;
+  digitalWrite(MOD_MEM_LED_OK, HIGH);
+}
+
+void moduleMEMCheckButton(){
+  int mem_btn_1_state = digitalRead(MOD_MEM_BTN_1);
+  int mem_btn_2_state = digitalRead(MOD_MEM_BTN_2);
+  int mem_btn_3_state = digitalRead(MOD_MEM_BTN_3);
+  int mem_btn_4_state = digitalRead(MOD_MEM_BTN_4);
+
+  if(mem_btn_1_state == HIGH){
+    Serial.println("botao 1");
+  }
+  if(mem_btn_2_state == HIGH){
+    Serial.println("botao 2");
+  }
+  if(mem_btn_3_state == HIGH){
+    Serial.println("botao 3");
+  }
+    if(mem_btn_4_state == HIGH){
+    Serial.println("botao 4");
+  }
+
+  if (mem_btn_1_state == HIGH && mem_btn_1 == false){
+    mem_btn_1 = true;
+    if(mem_stages_correct_positions[mem_current_stage] == 0){
+      mem_current_stage++;
+      digitalWrite(MOD_MEM_LED_1, HIGH);
+      if(mem_current_stage == 5){
+        moduleMEMUnlockModule();
+        return;
+      }
+      moduleMEMDisplay(mem_current_stage);
     } else {
-      buttonToPress = (stage == 1 || stage == 3) ? serial[2] - '0' : 4;
-    }
-
-    Serial.print("Pressione o botão com o número ");
-    Serial.println(buttonToPress);
-    delay(3000);
-
-    int userInput = 0;
-    if (digitalRead(buttonToPress) == HIGH) {
-      userInput = buttonToPress;
-    }
-
-    if (userInput != buttonToPress) {
-      Serial.println("Erro! Recomeçando o módulo no Estágio 1.");
-      errors++;
-      return;
+      Serial.println("Falha no botao 1");
+      mem_current_stage = 0;
+      moduleMEMDisplay(0);
+      addError();
+      digitalWrite(MOD_MEM_LED_1, LOW);
+      digitalWrite(MOD_MEM_LED_2, LOW);
+      digitalWrite(MOD_MEM_LED_3, LOW);
+      digitalWrite(MOD_MEM_LED_4, LOW);
     }
   }
-  Serial.println("Parabéns! Você desarmou o módulo.");
+  if (mem_btn_1_state == LOW && mem_btn_1 == true){
+    mem_btn_1 = false;
+  }
+
+  if (mem_btn_2_state == HIGH && mem_btn_2 == false){
+    mem_btn_2 = true;
+    if(mem_stages_correct_positions[mem_current_stage] == 1){
+      mem_current_stage++;
+      digitalWrite(MOD_MEM_LED_2, HIGH);
+      if(mem_current_stage == 5){
+        moduleMEMUnlockModule();
+        return;
+      }
+      moduleMEMDisplay(mem_current_stage);
+    } else {
+      Serial.println("Falha no botao 2");
+      mem_current_stage = 0;
+      moduleMEMDisplay(0);
+      addError();
+      digitalWrite(MOD_MEM_LED_1, LOW);
+      digitalWrite(MOD_MEM_LED_2, LOW);
+      digitalWrite(MOD_MEM_LED_3, LOW);
+      digitalWrite(MOD_MEM_LED_4, LOW);
+    }
+  }
+  if (mem_btn_2_state == LOW && mem_btn_2 == true){
+    mem_btn_2 = false;
+  }
+
+  if (mem_btn_3_state == HIGH && mem_btn_3 == false){
+    mem_btn_3 = true;
+    if(mem_stages_correct_positions[mem_current_stage] == 2){
+      moduleMEMDisplay(mem_current_stage);
+      mem_current_stage++;
+      if(mem_current_stage == 5){
+        moduleMEMUnlockModule();
+        return;
+      }
+      digitalWrite(MOD_MEM_LED_3, HIGH);
+    } else {
+      Serial.println("Falha no botao 3");
+      mem_current_stage = 0;
+      moduleMEMDisplay(0);
+      addError();
+      digitalWrite(MOD_MEM_LED_1, LOW);
+      digitalWrite(MOD_MEM_LED_2, LOW);
+      digitalWrite(MOD_MEM_LED_3, LOW);
+      digitalWrite(MOD_MEM_LED_4, LOW);
+    }
+  }
+  if (mem_btn_3_state == LOW && mem_btn_3 == true){
+    mem_btn_3 = false;
+  }
+
+  if (mem_btn_4_state == HIGH && mem_btn_4 == false){
+    mem_btn_4 = true;
+    if(mem_stages_correct_positions[mem_current_stage] == 3){
+      mem_current_stage++;
+      digitalWrite(MOD_MEM_LED_4, HIGH);
+      if(mem_current_stage == 5){
+        moduleMEMUnlockModule();
+        return;
+      }
+      moduleMEMDisplay(mem_current_stage);
+    } else {
+      Serial.println("Falha no botao 4");
+      mem_current_stage = 0;
+      moduleMEMDisplay(0);
+      addError();
+      digitalWrite(MOD_MEM_LED_1, LOW);
+      digitalWrite(MOD_MEM_LED_2, LOW);
+      digitalWrite(MOD_MEM_LED_3, LOW);
+      digitalWrite(MOD_MEM_LED_4, LOW);
+    }
+  }
+  if (mem_btn_4_state == LOW && mem_btn_4 == true){
+    mem_btn_4 = false;
+  }
+}
+
+void moduleMEMDisplay(int stage){
+  char bufferNumber[16];
+  char bufferLabels[16];
+
+  snprintf(bufferNumber, sizeof(bufferNumber), "       %d    ", mem_stages_numbers[stage]);
+  snprintf(bufferLabels, sizeof(bufferLabels), "%d   %d    %d    %d", mem_stages_labels[stage][0], mem_stages_labels[stage][1], mem_stages_labels[stage][2], mem_stages_labels[stage][3]);
+
+  display_mem.setCursor(0,0);
+  display_mem.print(bufferNumber);
+
+  display_mem.setCursor(0,1);
+  display_mem.print(bufferLabels);
+}
+
+void moduleMEMGenerateRandomLabels(){
+  int randomNumber;
+  for (int i = 0; i < 5; i++) {
+    bool usedNumbers[4] = {false, false, false, false};
+    for (int j = 0; j < 4; j++){
+      do {
+        randomNumber = random(1, 5);
+      } while (usedNumbers[randomNumber - 1]);
+      mem_stages_labels[i][j] = randomNumber;
+      usedNumbers[randomNumber - 1] = true;
+    }
+  }
+}
+
+void moduleMEMGenerateRandomNumbers(){
+  for (int i = 0; i < 5; i++) {
+    mem_stages_numbers[i] = random(1, 5);
+  }
+}
+
+void moduleMEMGenerateCorrectPositions(){
+  //Stage 0
+  switch(mem_stages_numbers[0]){
+    case 1:
+      mem_stages_correct_positions[0] = 1;
+      break;
+    case 2:
+      mem_stages_correct_positions[0] = 1;
+      break;
+    case 3:
+      mem_stages_correct_positions[0] = 2;
+      break;
+    case 4:
+      mem_stages_correct_positions[0] = 3;
+      break;
+  }
+
+  //Stage 1
+  switch(mem_stages_numbers[1]){
+    case 1:
+      mem_stages_correct_positions[1] = findIndex(mem_stages_labels[1], 4, 4);
+      break;
+    case 2:
+      mem_stages_correct_positions[1] = mem_stages_correct_positions[0];
+      break;
+    case 3:
+      mem_stages_correct_positions[1] = 0;
+      break;
+    case 4:
+      mem_stages_correct_positions[1] = mem_stages_correct_positions[0];
+      break;
+  }
+
+  //Stage 2
+  switch(mem_stages_numbers[2]){
+    case 1:
+      mem_stages_correct_positions[2] = findIndex(mem_stages_labels[2], 4, mem_stages_labels[1][mem_stages_correct_positions[1]]);
+      break;
+    case 2:
+      mem_stages_correct_positions[2] = findIndex(mem_stages_labels[2], 4, mem_stages_labels[0][mem_stages_correct_positions[0]]);
+      break;
+    case 3:
+      mem_stages_correct_positions[2] = 2;
+      break;
+    case 4:
+      mem_stages_correct_positions[2] = findIndex(mem_stages_labels[2], 4, 4);
+      break;
+  }
+
+  //Stage 3
+  switch(mem_stages_numbers[3]){
+    case 1:
+      mem_stages_correct_positions[3] = mem_stages_correct_positions[0];
+      break;
+    case 2:
+      mem_stages_correct_positions[3] = 0;
+      break;
+    case 3:
+      mem_stages_correct_positions[3] = mem_stages_correct_positions[1];
+      break;
+    case 4:
+      mem_stages_correct_positions[3] = mem_stages_correct_positions[1];
+      break;
+  }
+
+  //Stage 4
+  switch(mem_stages_numbers[4]){
+    case 1:
+      mem_stages_correct_positions[4] = mem_stages_correct_positions[0];
+      break;
+    case 2:
+      mem_stages_correct_positions[4] = mem_stages_correct_positions[1];
+      break;
+    case 3:
+      mem_stages_correct_positions[4] = mem_stages_correct_positions[3];
+      break;
+    case 4:
+      mem_stages_correct_positions[4] = mem_stages_correct_positions[2];
+      break;
+  }
 }
 
 
@@ -868,7 +1119,7 @@ void setup() {
   display_main.print("Iniciante");
 
   display_mem.init();
-  display_mem.backlight();
+  //display_mem.backlight();
 }
 
 void loop() {
@@ -878,6 +1129,9 @@ void loop() {
     updateBuzzer();
     modulePTBLoop();
     moduleGENLoop();
+    checkModulesUnlocked();
+    //moduleMEMLoop();
+    digitalWrite(MOD_MEM_LED_OK, HIGH);
     //module2Loop(&serial_number[0]);
     //module3Loop(&serial_number[0]);
   } else {
