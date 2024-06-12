@@ -76,132 +76,6 @@ enum Color {
 };
 
 
-void setup() {
-  pinMode(ERR_LED_1, OUTPUT);
-  pinMode(ERR_LED_2, OUTPUT);
-  pinMode(MOD_PTB_LED_OK, OUTPUT);
-  pinMode(MOD_PTB_LED_R, OUTPUT);
-  pinMode(MOD_PTB_LED_G, OUTPUT);
-  pinMode(MOD_PTB_LED_B, OUTPUT);
-  pinMode(MOD_GEN_LED_OK, OUTPUT);
-  pinMode(MOD_GEN_LED_R, OUTPUT);
-  pinMode(MOD_GEN_LED_Y, OUTPUT);
-  pinMode(MOD_GEN_LED_G, OUTPUT);
-  pinMode(MOD_GEN_LED_P, OUTPUT);
-  pinMode(MOD_MEM_LED_OK, OUTPUT);
-  pinMode(MOD_MEM_LED_1, OUTPUT);
-  pinMode(MOD_MEM_LED_2, OUTPUT);
-  pinMode(MOD_MEM_LED_3, OUTPUT);
-  pinMode(MOD_MEM_LED_4, OUTPUT);
-  pinMode(GAME_BTN_1, INPUT);
-  pinMode(GAME_BTN_2, INPUT);
-  pinMode(MOD_GEN_BTN_R, INPUT);
-  pinMode(MOD_GEN_BTN_G, INPUT);
-  pinMode(MOD_GEN_BTN_Y, INPUT);
-  pinMode(MOD_GEN_BTN_P, INPUT);
-  pinMode(MOD_PTB_BTN, INPUT);
-  pinMode(BUZZER_PIN, OUTPUT);
-  pinMode(MOD_MEM_BTN_1, INPUT);
-  pinMode(MOD_MEM_BTN_2, INPUT);
-  pinMode(MOD_MEM_BTN_3, INPUT);
-  pinMode(MOD_MEM_BTN_4, INPUT);
-
-  startGame();
-}
-
-void loop() {
-  if(serial_number != ""){
-    //----------Game Running----------//
-    updateTimer();
-    updateBuzzer();
-    modulePTBLoop();
-
-    
-    modulePTBLoop(serial_number);
-    module1Loop(serial_number);
-    module2Loop(serial_number);
-    module3Loop(serial_number);
-  } else {
-    //----------Test Mode----------//
-    int ptb_btn = digitalRead(MOD_PTB_BTN);
-    int ptb_gen_r = digitalRead(MOD_GEN_BTN_R);
-    int ptb_gen_g = digitalRead(MOD_GEN_BTN_G);
-    int ptb_gen_y = digitalRead(MOD_GEN_BTN_Y);
-    int ptb_gen_p = digitalRead(MOD_GEN_BTN_P);
-    int mem_btn_1 = digitalRead(MOD_MEM_BTN_1);
-    int mem_btn_2 = digitalRead(MOD_MEM_BTN_2);
-    int mem_btn_3 = digitalRead(MOD_MEM_BTN_3);
-    int mem_btn_4 = digitalRead(MOD_MEM_BTN_4);
-    int game_btn_1 = digitalRead(GAME_BTN_1);
-    int game_btn_2 = digitalRead(GAME_BTN_2);
-
-    if(ptb_btn == LOW){
-      digitalWrite(MOD_PTB_LED_R, HIGH);
-      digitalWrite(MOD_PTB_LED_B, HIGH);
-      digitalWrite(MOD_PTB_LED_G, HIGH);
-    } else {
-      digitalWrite(MOD_PTB_LED_R, LOW);
-      digitalWrite(MOD_PTB_LED_B, LOW);
-      digitalWrite(MOD_PTB_LED_G, LOW);
-    }
-
-    if(ptb_gen_r == LOW){
-      digitalWrite(MOD_GEN_LED_R, HIGH);
-    } else {
-      digitalWrite(MOD_GEN_LED_R, LOW);
-    }
-    if(ptb_gen_g == LOW){
-      digitalWrite(MOD_GEN_LED_G, HIGH);
-    } else {
-      digitalWrite(MOD_GEN_LED_G, LOW);
-    }
-    if(ptb_gen_y == LOW){
-      digitalWrite(MOD_GEN_LED_Y, HIGH);
-    } else {
-      digitalWrite(MOD_GEN_LED_Y, LOW);
-    }
-    if(ptb_gen_p == LOW){
-      digitalWrite(MOD_GEN_LED_P, HIGH);
-    } else {
-      digitalWrite(MOD_GEN_LED_P, LOW);
-    }
-
-    if(mem_btn_1 == HIGH){
-      digitalWrite(MOD_MEM_LED_1, HIGH);
-    } else {
-      digitalWrite(MOD_MEM_LED_1, LOW);
-    }
-    if(mem_btn_2 == HIGH){
-      digitalWrite(MOD_MEM_LED_2, HIGH);
-    } else {
-      digitalWrite(MOD_MEM_LED_2, LOW);
-    }
-    if(mem_btn_3 == HIGH){
-      digitalWrite(MOD_MEM_LED_3, HIGH);
-    } else {
-      digitalWrite(MOD_MEM_LED_3, LOW);
-    }
-    if(mem_btn_4 == HIGH){
-      digitalWrite(MOD_MEM_LED_4, HIGH);
-    } else {
-      digitalWrite(MOD_MEM_LED_4, LOW);
-    }
-
-    if(game_btn_2 == HIGH){
-      digitalWrite(ERR_LED_1, HIGH);
-      digitalWrite(ERR_LED_2, HIGH); 
-      digitalWrite(MOD_PTB_LED_OK, HIGH);
-      digitalWrite(MOD_GEN_LED_OK, HIGH);
-      digitalWrite(MOD_MEM_LED_OK, HIGH);
-    } else {
-      digitalWrite(ERR_LED_1, LOW);
-      digitalWrite(ERR_LED_2, LOW);
-      digitalWrite(MOD_PTB_LED_OK, LOW);
-      digitalWrite(MOD_GEN_LED_OK, LOW);
-      digitalWrite(MOD_MEM_LED_OK, LOW);
-    }
-  }
-}
 
 
 
@@ -219,10 +93,60 @@ void gameOver() {
   serial_number = "";
   timer_ms = 0;
   start_ms = 0;
+
+  int points = 0;
+
+  if (ptb_status == true) points += 35;
+  if (gen_status == true) points += 40;
+  if (mem_status == true) points += 50;
+  points += timer_numbers;
+
+  char buffer[20];
+  snprintf(buffer, sizeof(buffer), "Pontuacao: %d", points);
+
+  display_main.setCursor(0,0);
+  display_main.print("A Bomba Explodiu!");
+  display_main.setCursor(0,1);
+  display_main.print(buffer);
 }
 
 void gameWin() {
-  
+  serial_number = "";
+  timer_ms = 0;
+  start_ms = 0;
+
+  int points = 0;
+
+  if (ptb_status == true) points += 70;
+  if (gen_status == true) points += 80;
+  if (mem_status == true) points += 100;
+  points += timer_numbers;
+
+  char buffer[20];
+  snprintf(buffer, sizeof(buffer), "Pontuacao: %d", points);
+
+  display_main.setCursor(0,0);
+  display_main.print("Bomba desarmada! <3");
+  display_main.setCursor(0,1);
+  display_main.print(buffer);
+}
+
+void gameChangeDifficulty(){
+  if(difficulty == 1){
+    difficulty++;
+    display_main.setCursor(0,1);
+    display_main.print("Avançado");
+  }
+  else if(difficulty == 2){
+    difficulty++;
+    display_main.setCursor(0,1);
+    display_main.print("Profissional");
+  }
+  else if (difficulty == 3){
+    difficulty = 1;
+    display_main.setCursor(0,1);
+    display_main.print("Iniciante");
+  }
 }
 
 void addError(){
@@ -308,6 +232,8 @@ bool timerHasDigit(char number) {
 
 
 
+
+
 // ----------------------------------------------------------------------------- //
 // -------------------------- SERIAL NUMBER FUNCTIONS -------------------------- //
 // ----------------------------------------------------------------------------- //
@@ -321,9 +247,6 @@ void generateSerialNumber() {
 
   String hexString = "";
 
-  display_main.init();
-  display_main.backlight();
-
   for (int i = 0; i < 8; i++) {
     int randomNumber = random(0, 16); 
     char hexDigit = (randomNumber < 10) ? (char)('0' + randomNumber) : (char)('A' + (randomNumber - 10));
@@ -336,8 +259,6 @@ void generateSerialNumber() {
   display_main.setCursor(0,1);
   display_main.print(serial_number);
 }
-
-
 
 
 
@@ -519,7 +440,7 @@ void modulePTBStage2(int time_released) {
 }
 
 //Loop function that checks button status changes of the module
-void modulePTBLoop(const char* serial_number) {
+void modulePTBLoop() {
   if(ptb_status == true) return;
 
   int button_state = digitalRead(MOD_PTB_BTN);
@@ -540,7 +461,10 @@ void modulePTBLoop(const char* serial_number) {
 
 
 
-//Modulo 2
+
+// --------------------------------------------------------------------- //
+// -------------------------- MODULE - GENIUS -------------------------- //
+// --------------------------------------------------------------------- //
 void module2Loop(const char* serial) {
   Color ledColor = generateRandomColor();
   if (ledColor == RED || ledColor == PURPLE || ledColor == GREEN) {
@@ -577,7 +501,13 @@ void module2Loop(const char* serial) {
   }
 }
 
-//Modulo 3
+
+
+
+
+// --------------------------------------------------------------------- //
+// -------------------------- MODULE - MEMORY -------------------------- //
+// --------------------------------------------------------------------- //
 void module3Loop(const char* serial) {
   srand(time(NULL));
   const int numStages = 5;
@@ -615,4 +545,83 @@ void module3Loop(const char* serial) {
     }
   }
   Serial.println("Parabéns! Você desarmou o módulo.");
+}
+
+
+
+
+
+// ----------------------------------------------------------------------------- //
+// -------------------------- ARDUINO BASIC FUNCTIONS -------------------------- //
+// ----------------------------------------------------------------------------- //
+bool game_btn_1_status = false;
+bool game_btn_2_status = false;
+
+void setup() {
+  pinMode(ERR_LED_1, OUTPUT);
+  pinMode(ERR_LED_2, OUTPUT);
+  pinMode(MOD_PTB_LED_OK, OUTPUT);
+  pinMode(MOD_PTB_LED_R, OUTPUT);
+  pinMode(MOD_PTB_LED_G, OUTPUT);
+  pinMode(MOD_PTB_LED_B, OUTPUT);
+  pinMode(MOD_GEN_LED_OK, OUTPUT);
+  pinMode(MOD_GEN_LED_R, OUTPUT);
+  pinMode(MOD_GEN_LED_Y, OUTPUT);
+  pinMode(MOD_GEN_LED_G, OUTPUT);
+  pinMode(MOD_GEN_LED_P, OUTPUT);
+  pinMode(MOD_MEM_LED_OK, OUTPUT);
+  pinMode(MOD_MEM_LED_1, OUTPUT);
+  pinMode(MOD_MEM_LED_2, OUTPUT);
+  pinMode(MOD_MEM_LED_3, OUTPUT);
+  pinMode(MOD_MEM_LED_4, OUTPUT);
+  pinMode(GAME_BTN_1, INPUT);
+  pinMode(GAME_BTN_2, INPUT);
+  pinMode(MOD_GEN_BTN_R, INPUT);
+  pinMode(MOD_GEN_BTN_G, INPUT);
+  pinMode(MOD_GEN_BTN_Y, INPUT);
+  pinMode(MOD_GEN_BTN_P, INPUT);
+  pinMode(MOD_PTB_BTN, INPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(MOD_MEM_BTN_1, INPUT);
+  pinMode(MOD_MEM_BTN_2, INPUT);
+  pinMode(MOD_MEM_BTN_3, INPUT);
+  pinMode(MOD_MEM_BTN_4, INPUT);
+
+  display_main.init();
+  display_main.backlight();
+  display_main.setCursor(0,0);
+  display_main.print("Nova Bomba");
+  display_main.setCursor(0,1);
+  display_main.print("Iniciante");
+
+  display_mem.init();
+  display_mem.backlight();
+}
+
+void loop() {
+  if(serial_number != ""){
+    //----------Game Running----------//
+    updateTimer();
+    updateBuzzer();
+    modulePTBLoop();
+    module2Loop(serial_number);
+    module3Loop(serial_number);
+  } else {
+    //----------Game Not Running----------//
+    if(game_btn_1_status == false && digitalRead(GAME_BTN_1) == HIGH){
+      game_btn_1_status = true;
+      startGame();
+    }
+    else if(game_btn_1_status == true && digitalRead(GAME_BTN_1) == LOW){
+      game_btn_1_status = false;
+    }
+
+    if(game_btn_2_status == false && digitalRead(GAME_BTN_2) == HIGH){
+      game_btn_2_status = true;
+      gameChangeDifficulty();
+    }
+    else if(game_btn_2_status == true && digitalRead(GAME_BTN_2) == LOW){
+      game_btn_2_status = false;
+    }
+  }
 }
