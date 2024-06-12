@@ -86,6 +86,7 @@ enum Color {
 
 void startGame() {
   generateSerialNumber();
+  modulePTBStart();
   startTimer();
 }
 
@@ -493,7 +494,6 @@ void module2Loop(const char* serial) {
           break;
       }
     }
-    delay(1000);
     digitalWrite(MOD_SMS_LED_R, LOW);
     digitalWrite(MOD_SMS_LED_Y, LOW);
     digitalWrite(MOD_SMS_LED_P, LOW);
@@ -533,7 +533,7 @@ void module3Loop(const char* serial) {
     Serial.println(buttonToPress);
     delay(3000);
 
-    int userInput = 0; // Simulando entrada do usuário (0 como valor padrão)
+    int userInput = 0;
     if (digitalRead(buttonToPress) == HIGH) {
       userInput = buttonToPress;
     }
