@@ -29,8 +29,8 @@
 #define ERR_LED_2 A1
 #define MOD_PTB_LED_OK A2
 #define MOD_PTB_LED_R A3
-#define MOD_PTB_LED_G A4
-#define MOD_PTB_LED_B A5
+#define MOD_PTB_LED_B A4
+#define MOD_PTB_LED_G A5
 #define MOD_GEN_LED_OK A6
 #define MOD_GEN_LED_P A7
 #define MOD_GEN_LED_R A8
@@ -136,17 +136,17 @@ void gameChangeDifficulty(){
   if(difficulty == 1){
     difficulty++;
     display_main.setCursor(0,1);
-    display_main.print("Avancado");
+    display_main.print("Avancado        ");
   }
   else if(difficulty == 2){
     difficulty++;
     display_main.setCursor(0,1);
-    display_main.print("Profissional");
+    display_main.print("Profissional    ");
   }
   else if (difficulty == 3){
     difficulty = 1;
     display_main.setCursor(0,1);
-    display_main.print("Iniciante");
+    display_main.print("Iniciante      ");
   }
 }
 
@@ -371,7 +371,6 @@ void modulePTBChangeColor(Color color){
 void modulePTBStart(){
   ptb_color_stage_1 = generateRandomColor();
   ptb_color_stage_2 = generateRandomColor();
-
   modulePTBChangeColor(ptb_color_stage_1);
 }
 
@@ -557,6 +556,8 @@ bool game_btn_1_status = false;
 bool game_btn_2_status = false;
 
 void setup() {
+  Serial.begin(9600);
+
   pinMode(ERR_LED_1, OUTPUT);
   pinMode(ERR_LED_2, OUTPUT);
   pinMode(MOD_PTB_LED_OK, OUTPUT);
@@ -603,8 +604,8 @@ void loop() {
     updateTimer();
     updateBuzzer();
     modulePTBLoop();
-    module2Loop(&serial_number[0]);
-    module3Loop(&serial_number[0]);
+    //module2Loop(&serial_number[0]);
+    //module3Loop(&serial_number[0]);
   } else {
     //----------Game Not Running----------//
     if(game_btn_1_status == false && digitalRead(GAME_BTN_1) == HIGH){
