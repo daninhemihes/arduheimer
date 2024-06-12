@@ -136,7 +136,7 @@ void gameChangeDifficulty(){
   if(difficulty == 1){
     difficulty++;
     display_main.setCursor(0,1);
-    display_main.print("Avançado");
+    display_main.print("Avancado");
   }
   else if(difficulty == 2){
     difficulty++;
@@ -368,7 +368,7 @@ void modulePTBChangeColor(Color color){
 }
 
 //Starts the module by generating the colors randomly
-void modulePTBStart(const char* serial_number){
+void modulePTBStart(){
   ptb_color_stage_1 = generateRandomColor();
   ptb_color_stage_2 = generateRandomColor();
 
@@ -387,14 +387,14 @@ void modulePTBStage1() {
     modulePTBChangeColor(ptb_color_stage_2);
   }
   else if (ptb_color_stage_1 == GREEN && countEvens >= 2){
-    ptb_status == true;
+    ptb_status = true;
     digitalWrite(MOD_PTB_LED_OK, HIGH);
   }
   else if (ptb_color_stage_1 == YELLOW && endsWithEven){
     modulePTBChangeColor(ptb_color_stage_2);
   }
   else if (ptb_color_stage_1 == RED){
-    ptb_status == true;
+    ptb_status = true;
     digitalWrite(MOD_PTB_LED_OK, HIGH);
   }
   else {
@@ -405,10 +405,10 @@ void modulePTBStage1() {
 //When button is released, starts stage 2 checker
 //If the button was released correctly, it will automatically unlock the module
 //If not, will add an error to the player
-void modulePTBStage2(int time_released) {
+void modulePTBStage2() {
   if(ptb_color_stage_2 == BLUE){
     if(timerHasDigit('4')){
-      ptb_status == true;
+      ptb_status = true;
       digitalWrite(MOD_PTB_LED_OK, HIGH);
     } else {
       addError();
@@ -416,7 +416,7 @@ void modulePTBStage2(int time_released) {
   }
   else if(ptb_color_stage_2 == GREEN){
     if(timerHasDigit('1')){
-      ptb_status == true;
+      ptb_status = true;
       digitalWrite(MOD_PTB_LED_OK, HIGH);
     } else {
       addError();
@@ -424,7 +424,7 @@ void modulePTBStage2(int time_released) {
   }
   else if(ptb_color_stage_2 == YELLOW){
     if(timerHasDigit('5')){
-      ptb_status == true;
+      ptb_status = true;
       digitalWrite(MOD_PTB_LED_OK, HIGH);
     } else {
       addError();
@@ -432,7 +432,7 @@ void modulePTBStage2(int time_released) {
   }
   else{
     if(timerHasDigit('1')){
-      ptb_status == true;
+      ptb_status = true;
       digitalWrite(MOD_PTB_LED_OK, HIGH);
     } else {
       addError();
@@ -468,36 +468,36 @@ void modulePTBLoop() {
 // --------------------------------------------------------------------- //
 void module2Loop(const char* serial) {
   Color ledColor = generateRandomColor();
-  if (ledColor == RED || ledColor == PURPLE || ledColor == GREEN) {
-    if (hasVowel(serial)) {
+  if (ledColor == RED || ledColor == BLUE || ledColor == GREEN) {
+    if (checkSerialNumberHasVowel()) {
       switch (ledColor) {
         case RED:
-          digitalWrite(MOD_SMS_LED_R, HIGH);
+          digitalWrite(MOD_GEN_LED_R, HIGH);
           break;
-        case PURPLE:
-          digitalWrite(MOD_SMS_LED_P, HIGH);
+        case BLUE:
+          digitalWrite(MOD_GEN_LED_P, HIGH);
           break;
         case GREEN:
-          digitalWrite(MOD_SMS_LED_G, HIGH);
+          digitalWrite(MOD_GEN_LED_G, HIGH);
           break;
       }
     } else {
       switch (ledColor) {
         case RED:
-          digitalWrite(MOD_SMS_LED_Y, HIGH);
+          digitalWrite(MOD_GEN_LED_Y, HIGH);
           break;
-        case PURPLE:
-          digitalWrite(MOD_SMS_LED_Y, HIGH);
+        case BLUE:
+          digitalWrite(MOD_GEN_LED_Y, HIGH);
           break;
         case GREEN:
-          digitalWrite(MOD_SMS_LED_R, HIGH);
+          digitalWrite(MOD_GEN_LED_R, HIGH);
           break;
       }
     }
-    digitalWrite(MOD_SMS_LED_R, LOW);
-    digitalWrite(MOD_SMS_LED_Y, LOW);
-    digitalWrite(MOD_SMS_LED_P, LOW);
-    digitalWrite(MOD_SMS_LED_G, LOW);
+    digitalWrite(MOD_GEN_LED_R, LOW);
+    digitalWrite(MOD_GEN_LED_Y, LOW);
+    digitalWrite(MOD_GEN_LED_P, LOW);
+    digitalWrite(MOD_GEN_LED_G, LOW);
   }
 }
 
@@ -509,12 +509,11 @@ void module2Loop(const char* serial) {
 // -------------------------- MODULE - MEMORY -------------------------- //
 // --------------------------------------------------------------------- //
 void module3Loop(const char* serial) {
-  srand(time(NULL));
   const int numStages = 5;
   const int numButtons = 4;
 
   for (int stage = 1; stage <= numStages; ++stage) {
-    int randomNumber = generateRandomNumber();
+    int randomNumber = random(1, 5);
     Serial.print("Número exibido: ");
     Serial.println(randomNumber);
 
@@ -604,8 +603,8 @@ void loop() {
     updateTimer();
     updateBuzzer();
     modulePTBLoop();
-    module2Loop(serial_number);
-    module3Loop(serial_number);
+    module2Loop(&serial_number[0]);
+    module3Loop(&serial_number[0]);
   } else {
     //----------Game Not Running----------//
     if(game_btn_1_status == false && digitalRead(GAME_BTN_1) == HIGH){
