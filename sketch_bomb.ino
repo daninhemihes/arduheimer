@@ -16,7 +16,7 @@
 #define MOD_GEN_BTN_R 26
 #define MOD_GEN_BTN_G 27
 #define MOD_GEN_BTN_Y 28
-#define MOD_GEN_BTN_P 29
+#define MOD_GEN_BTN_B 29
 #define MOD_PTB_BTN 8
 #define BUZZER_PIN 9
 #define MOD_MEM_BTN_1 40
@@ -32,7 +32,7 @@
 #define MOD_PTB_LED_B A4
 #define MOD_PTB_LED_G A5
 #define MOD_GEN_LED_OK A6
-#define MOD_GEN_LED_P A7
+#define MOD_GEN_LED_B A7
 #define MOD_GEN_LED_R A8
 #define MOD_GEN_LED_G A9
 #define MOD_GEN_LED_Y A10
@@ -60,6 +60,7 @@ String serial_number = "";
 bool ptb_status = false;
 bool gen_status = false;
 bool mem_status = false;
+int mod_gen_length = 4;
 
 //---------- BUZZER ----------//
 long lastBuzzerChange = 0;
@@ -67,7 +68,7 @@ int buzzerState = 0;
 long buzzerDurations[] = {600, 300, 100};
 long buzzerInterval = 0;
 
-//---------- MODULES ----------//
+//---------- ENUMS ----------//
 enum Color {
     RED,
     GREEN,
@@ -87,6 +88,7 @@ enum Color {
 void startGame() {
   generateSerialNumber();
   modulePTBStart();
+  moduleGENStart();
   startTimer();
 }
 
@@ -135,16 +137,19 @@ void gameWin() {
 void gameChangeDifficulty(){
   if(difficulty == 1){
     difficulty++;
+    mod_gen_length = 6;
     display_main.setCursor(0,1);
     display_main.print("Avancado        ");
   }
   else if(difficulty == 2){
     difficulty++;
+    mod_gen_length = 8;
     display_main.setCursor(0,1);
     display_main.print("Profissional    ");
   }
   else if (difficulty == 3){
     difficulty = 1;
+    mod_gen_length = 4;
     display_main.setCursor(0,1);
     display_main.print("Iniciante      ");
   }
@@ -154,9 +159,15 @@ void addError(){
   errors++;
   if(errors == 1){
     digitalWrite(ERR_LED_1, HIGH);
+    tone(BUZZER_PIN, 500);
+    delay(300);
+    noTone(BUZZER_PIN);
   }
   else if (errors == 2) {
     digitalWrite(ERR_LED_2, HIGH);
+    tone(BUZZER_PIN, 500);
+    delay(300);
+    noTone(BUZZER_PIN);
   }
   else if (errors > 2) {
     gameOver();
@@ -168,10 +179,18 @@ Color generateRandomColor(){
   return static_cast<Color>(randomValue);
 }
 
+Color* generateRandomColorSequence(int length) {
+  Color* sequence = (Color*)malloc(length * sizeof(Color));
+  for (int i = 0; i < length; i++) {
+    sequence[i] = random(4);
+  }
+  return sequence;
+}
+
 bool checkSerialNumberHasVowel() {
   const char *ptr = serial_number.c_str();
   while (*ptr != '\0') {
-    if (*ptr == 'A' || *ptr == 'E') {
+    if (*ptr == 'A' || *ptr == 'a' || *ptr == 'E' || *ptr == 'e') {
       return true;
     }
     ptr++;
@@ -231,14 +250,6 @@ bool timerHasDigit(char number) {
   return false;
 }
 
-
-
-
-
-// ----------------------------------------------------------------------------- //
-// -------------------------- SERIAL NUMBER FUNCTIONS -------------------------- //
-// ----------------------------------------------------------------------------- //
-
 void generateSerialNumber() {
   size_t const address {0};
   unsigned int seed {};
@@ -254,9 +265,10 @@ void generateSerialNumber() {
     hexString += hexDigit;
   }
   serial_number = hexString;
-
   display_main.setCursor(0,0);
   display_main.print("Serial Number");
+  display_main.setCursor(0,1);
+  display_main.print("                ");
   display_main.setCursor(0,1);
   display_main.print(serial_number);
 }
@@ -465,6 +477,267 @@ void modulePTBLoop() {
 // --------------------------------------------------------------------- //
 // -------------------------- MODULE - GENIUS -------------------------- //
 // --------------------------------------------------------------------- //
+
+Color* color_sequence_show;
+Color* color_sequence_result;
+int gen_current_stage = 0;
+int gen_current_press = 0;
+int gen_stage_last_blink = 0;
+long gen_ms_last_blink = 0;
+bool gen_btn_r = false;
+bool gen_btn_g = false;
+bool gen_btn_b = false;
+bool gen_btn_y = false;
+
+void moduleGENStart(){
+  color_sequence_show = generateRandomColorSequence(mod_gen_length);
+  moduleGENGenerateResult();
+}
+
+void moduleGENLoop(){
+  if(gen_status == true) return;
+
+  moduleGENBlinkRunner();
+  moduleGENButtonChecker();
+}
+
+void moduleGENButtonChecker(){
+  int gen_btn_r_state = digitalRead(MOD_GEN_BTN_R);
+  int gen_btn_g_state = digitalRead(MOD_GEN_BTN_G);
+  int gen_btn_b_state = digitalRead(MOD_GEN_BTN_B);
+  int gen_btn_y_state = digitalRead(MOD_GEN_BTN_Y);
+
+  if (gen_btn_r_state == HIGH && gen_btn_r == false){
+    gen_btn_r = true;
+    moduleGENPressButon(RED);
+  }
+  if (gen_btn_r_state == LOW && gen_btn_r == true){
+    gen_btn_r = false;
+    moduleGENBlinkClear();
+  }
+
+  if (gen_btn_g_state == HIGH && gen_btn_g == false){
+    gen_btn_g = true;
+    moduleGENPressButon(GREEN);
+  }
+  if (gen_btn_g_state == LOW && gen_btn_g == true){
+    gen_btn_g = false;
+    moduleGENBlinkClear();
+  }
+
+  if (gen_btn_b_state == HIGH && gen_btn_b == false){
+    gen_btn_b = true;
+    moduleGENPressButon(BLUE);
+  }
+  if (gen_btn_b_state == LOW && gen_btn_b == true){
+    gen_btn_b = false;
+    moduleGENBlinkClear();
+  }
+
+  if (gen_btn_y_state == HIGH && gen_btn_y == false){
+    gen_btn_y = true;
+    moduleGENPressButon(YELLOW);
+  }
+  if (gen_btn_y_state == LOW && gen_btn_y == true){
+    gen_btn_y = false;
+    moduleGENBlinkClear();
+  }
+}
+
+void moduleGENPressButon(Color color){
+  moduleGENBlink(color);
+  if(color_sequence_result[gen_current_press] == color){
+    gen_ms_last_blink = millis();
+    gen_current_press++;
+
+    if(gen_current_press > gen_current_stage){
+      gen_current_stage++;
+      gen_stage_last_blink = gen_current_stage;
+    }
+
+    if(gen_current_stage >= mod_gen_length) {
+      gen_status = true;
+      digitalWrite(MOD_GEN_LED_OK, HIGH);
+      delay(300);
+      moduleGENBlinkClear();
+    }
+  } else {
+    gen_current_press = 0;
+    gen_current_stage = 0;
+    gen_stage_last_blink = 0;
+    addError();
+    free(color_sequence_show);
+    free(color_sequence_result);
+    color_sequence_show = generateRandomColorSequence(mod_gen_length);
+    moduleGENGenerateResult();
+  }
+}
+
+void moduleGENBlinkRunner(){
+  if ((gen_ms_last_blink + 5000) <= millis()){
+    if(true){
+      gen_ms_last_blink = millis();
+      moduleGENBlink(color_sequence_show[0]);
+      gen_stage_last_blink = 0;
+      gen_current_press = 0;
+    }
+  } 
+  else if((gen_ms_last_blink + 400) <= millis()){
+    if(gen_current_stage > gen_stage_last_blink){
+      gen_ms_last_blink = millis();
+      moduleGENBlink(color_sequence_show[gen_stage_last_blink + 1]);
+      gen_stage_last_blink++;
+    }
+  }
+  else if((gen_ms_last_blink + 300) <= millis()){
+    moduleGENBlinkClear();
+  }
+}
+
+void moduleGENBlink(Color color){
+  switch (color) {
+    case RED:
+      digitalWrite(MOD_GEN_LED_R, HIGH);
+      tone(BUZZER_PIN, 1046);
+      break;
+    case BLUE:
+      digitalWrite(MOD_GEN_LED_B, HIGH);
+      tone(BUZZER_PIN, 1174);
+      break;
+    case GREEN:
+      digitalWrite(MOD_GEN_LED_G, HIGH);
+      tone(BUZZER_PIN, 1318);
+      break;
+    case YELLOW:
+      digitalWrite(MOD_GEN_LED_Y, HIGH);
+      tone(BUZZER_PIN, 1396);
+      break;
+  }
+}
+
+void moduleGENBlinkClear(){
+  noTone(BUZZER_PIN);
+  digitalWrite(MOD_GEN_LED_R, LOW);
+  digitalWrite(MOD_GEN_LED_G, LOW);
+  digitalWrite(MOD_GEN_LED_B, LOW);
+  digitalWrite(MOD_GEN_LED_Y, LOW);
+}
+
+void moduleGENGenerateResult(){
+  color_sequence_result = (Color*)malloc(mod_gen_length * sizeof(Color));
+  bool serial_number_has_vowel = checkSerialNumberHasVowel();
+  if(serial_number_has_vowel){
+    for (int i = 0; i < mod_gen_length; i++){
+      if(errors == 0){
+        switch(color_sequence_show[i]){
+          case RED:
+            color_sequence_result[i] = BLUE;
+            break;
+          case GREEN:
+            color_sequence_result[i] = YELLOW;
+            break;
+          case BLUE:
+            color_sequence_result[i] = RED;
+            break;
+          case YELLOW:
+            color_sequence_result[i] = GREEN;
+            break;
+        }
+      }
+      else if (errors == 1){
+        switch(color_sequence_show[i]){
+          case RED:
+            color_sequence_result[i] = YELLOW;
+            break;
+          case GREEN:
+            color_sequence_result[i] = BLUE;
+            break;
+          case BLUE:
+            color_sequence_result[i] = GREEN;
+            break;
+          case YELLOW:
+            color_sequence_result[i] = RED;
+            break;
+        }
+      }
+      else if (errors == 2){
+        switch(color_sequence_show[i]){
+          case RED:
+            color_sequence_result[i] = GREEN;
+            break;
+          case GREEN:
+            color_sequence_result[i] = YELLOW;
+            break;
+          case BLUE:
+            color_sequence_result[i] = RED;
+            break;
+          case YELLOW:
+            color_sequence_result[i] = BLUE;
+            break;
+        }
+      }
+    }
+  }
+  else {
+    for (int i = 0; i < mod_gen_length; i++){
+      if(errors == 0){
+        switch(color_sequence_show[i]){
+          case RED:
+            color_sequence_result[i] = BLUE;
+            break;
+          case GREEN:
+            color_sequence_result[i] = GREEN;
+            break;
+          case BLUE:
+            color_sequence_result[i] = YELLOW;
+            break;
+          case YELLOW:
+            color_sequence_result[i] = RED;
+            break;
+        }
+      }
+      else if (errors == 1){
+        switch(color_sequence_show[i]){
+          case RED:
+            color_sequence_result[i] = RED;
+            break;
+          case GREEN:
+            color_sequence_result[i] = YELLOW;
+            break;
+          case BLUE:
+            color_sequence_result[i] = BLUE;
+            break;
+          case YELLOW:
+            color_sequence_result[i] = GREEN;
+            break;
+        }
+      }
+      else if (errors == 2){
+        switch(color_sequence_show[i]){
+          case RED:
+            color_sequence_result[i] = YELLOW;
+            break;
+          case GREEN:
+            color_sequence_result[i] = BLUE;
+            break;
+          case BLUE:
+            color_sequence_result[i] = GREEN;
+            break;
+          case YELLOW:
+            color_sequence_result[i] = RED;
+            break;
+        }
+      }
+    }
+  }
+}
+
+
+
+
+
+
+
 void module2Loop(const char* serial) {
   Color ledColor = generateRandomColor();
   if (ledColor == RED || ledColor == BLUE || ledColor == GREEN) {
@@ -474,7 +747,7 @@ void module2Loop(const char* serial) {
           digitalWrite(MOD_GEN_LED_R, HIGH);
           break;
         case BLUE:
-          digitalWrite(MOD_GEN_LED_P, HIGH);
+          digitalWrite(MOD_GEN_LED_B, HIGH);
           break;
         case GREEN:
           digitalWrite(MOD_GEN_LED_G, HIGH);
@@ -495,7 +768,7 @@ void module2Loop(const char* serial) {
     }
     digitalWrite(MOD_GEN_LED_R, LOW);
     digitalWrite(MOD_GEN_LED_Y, LOW);
-    digitalWrite(MOD_GEN_LED_P, LOW);
+    digitalWrite(MOD_GEN_LED_B, LOW);
     digitalWrite(MOD_GEN_LED_G, LOW);
   }
 }
@@ -568,7 +841,7 @@ void setup() {
   pinMode(MOD_GEN_LED_R, OUTPUT);
   pinMode(MOD_GEN_LED_Y, OUTPUT);
   pinMode(MOD_GEN_LED_G, OUTPUT);
-  pinMode(MOD_GEN_LED_P, OUTPUT);
+  pinMode(MOD_GEN_LED_B, OUTPUT);
   pinMode(MOD_MEM_LED_OK, OUTPUT);
   pinMode(MOD_MEM_LED_1, OUTPUT);
   pinMode(MOD_MEM_LED_2, OUTPUT);
@@ -579,7 +852,7 @@ void setup() {
   pinMode(MOD_GEN_BTN_R, INPUT);
   pinMode(MOD_GEN_BTN_G, INPUT);
   pinMode(MOD_GEN_BTN_Y, INPUT);
-  pinMode(MOD_GEN_BTN_P, INPUT);
+  pinMode(MOD_GEN_BTN_B, INPUT);
   pinMode(MOD_PTB_BTN, INPUT);
   pinMode(BUZZER_PIN, OUTPUT);
   pinMode(MOD_MEM_BTN_1, INPUT);
@@ -604,6 +877,7 @@ void loop() {
     updateTimer();
     updateBuzzer();
     modulePTBLoop();
+    moduleGENLoop();
     //module2Loop(&serial_number[0]);
     //module3Loop(&serial_number[0]);
   } else {
