@@ -100,7 +100,7 @@ void startGame() {
   generateSerialNumber();
   modulePTBStart();
   moduleGENStart();
-  //moduleMEMStart();
+  moduleMEMStart();
   moduleMEMUnlockModule();
   startTimer();
   digitalWrite(MOD_MEM_LED_OK, HIGH);
@@ -389,10 +389,10 @@ void updateBuzzer() {
         noTone(BUZZER_PIN);
         break;
       case 1:
-        //tone(BUZZER_PIN, 2178);
+        tone(BUZZER_PIN, 2178);
         break;
       case 2:
-        //tone(BUZZER_PIN, 1758);
+        tone(BUZZER_PIN, 1758);
         break;
     }
   }
@@ -818,8 +818,6 @@ void moduleMEMStart(){
   moduleMEMGenerateRandomNumbers();
   moduleMEMGenerateCorrectPositions();
   moduleMEMDisplay(0);
-  Serial.println(mem_stages_numbers[0]);
-  Serial.println(mem_stages_correct_positions[0]);
 }
 
 void moduleMEMLoop(){
@@ -838,19 +836,6 @@ void moduleMEMCheckButton(){
   int mem_btn_2_state = digitalRead(MOD_MEM_BTN_2);
   int mem_btn_3_state = digitalRead(MOD_MEM_BTN_3);
   int mem_btn_4_state = digitalRead(MOD_MEM_BTN_4);
-
-  if(mem_btn_1_state == HIGH){
-    Serial.println("botao 1");
-  }
-  if(mem_btn_2_state == HIGH){
-    Serial.println("botao 2");
-  }
-  if(mem_btn_3_state == HIGH){
-    Serial.println("botao 3");
-  }
-    if(mem_btn_4_state == HIGH){
-    Serial.println("botao 4");
-  }
 
   if (mem_btn_1_state == HIGH && mem_btn_1 == false){
     mem_btn_1 = true;
@@ -1119,7 +1104,7 @@ void setup() {
   display_main.print("Iniciante");
 
   display_mem.init();
-  //display_mem.backlight();
+  display_mem.backlight();
 }
 
 void loop() {
@@ -1130,10 +1115,8 @@ void loop() {
     modulePTBLoop();
     moduleGENLoop();
     checkModulesUnlocked();
-    //moduleMEMLoop();
+    moduleMEMLoop();
     digitalWrite(MOD_MEM_LED_OK, HIGH);
-    //module2Loop(&serial_number[0]);
-    //module3Loop(&serial_number[0]);
   } else {
     //----------Game Not Running----------//
     if(game_btn_1_status == false && digitalRead(GAME_BTN_1) == HIGH){
